@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, Suspense, lazy } from "react";
 import { AdminResultsPanel } from "./components/admin/AdminResultsPanel";
+import { AdminNflResultsPanel } from "./components/admin/AdminNflResultsPanel";
 import { AdminFantasyRankingsPanel } from "./components/admin/AdminFantasyRankingsPanel";
 import { AppShell } from "./components/shell/AppShell";
 import { ErrorBoundary } from "./components/shell/ErrorBoundary";
@@ -11,17 +12,12 @@ import {
   buildLiveMorningForecast,
   buildLiveTeams,
 } from "./data/veridexLive";
-import { loadOfficialResults } from "./lib/supabase";
+import { loadOfficialResults, loadNflResults } from "./lib/supabase";
 import { loadLatestDailyBriefing } from "./lib/dailyBriefing";
 import type { StoredResults } from "./lib/types";
+import type { StoredNflResults } from "./data/nfl/nflLive";
 import { HomeView } from "./views/HomeView/HomeView";
 
-// Lazy-loaded — Home is the default landing tab and stays in the main
-// bundle so it appears instantly, but nobody needs Bracket's SVG/canvas
-// code, Forecasts' driver logic, What-If's whole simulator, or Rankings
-// until they actually click that tab. Splits one 539KB bundle into
-// pieces fetched on demand instead of all upfront, which matters more on
-// a phone on cellular than on wifi during development.
 const BracketView = lazy(() => import("./views/BracketView/BracketView").then((m) => ({ default: m.BracketView })));
 const ForecastsView = lazy(() => import("./views/ForecastsView/ForecastsView").then((m) => ({ default: m.ForecastsView })));
 const RankingsView = lazy(() => import("./views/RankingsView/RankingsView").then((m) => ({ default: m.RankingsView })));
@@ -39,6 +35,7 @@ function TabLoading() {
 
 const edition: Edition = "wire";
 const STORAGE_KEY = "worldcup-predictor-results";
+const NFL_STORAGE_KEY = "nfl-results";
 const VALID_TABS: TabId[] = ["home", "forecasts", "rankings", "analytics", "standings", "bracket", "nflSchedule", "nflRankings", "nflStandings", "nflForecasts", "nflFantasy"];
 
 function getTabFromHash(): TabId {
@@ -46,21 +43,16 @@ function getTabFromHash(): TabId {
   return VALID_TABS.includes(hash) ? hash : "home";
 }
 
-/**
- * Guarantees matches/knockoutMatches are always at least {} — never
- * missing or null. Without this, stale localStorage from before a schema
- * change (or any unexpected shape) crashes immediately on load: several
- * places do `stored.matches[id]` directly, which throws if `matches`
- * itself is undefined or null, before anything can even render. Fixing
- * it once here is far more reliable than trying to defensively guard
- * every individual call site that reads from `stored`.
- */
 function normalizeStoredResults(raw: unknown): StoredResults {
   const obj = (raw && typeof raw === "object" ? raw : {}) as Partial<StoredResults>;
   return {
     matches: obj.matches && typeof obj.matches === "object" ? obj.matches : {},
     knockoutMatches: obj.knockoutMatches && typeof obj.knockoutMatches === "object" ? obj.knockoutMatches : {},
   };
+}
+
+function normalizeStoredNflResults(raw: unknown): StoredNflResults {
+  return (raw && typeof raw === "object" ? raw : {}) as StoredNflResults;
 }
 
 function loadLocalResults(): StoredResults {
@@ -71,22 +63,20 @@ function loadLocalResults(): StoredResults {
   return normalizeStoredResults(seedResults);
 }
 
+function loadLocalNflResults(): StoredNflResults {
+  try {
+    const raw = localStorage.getItem(NFL_STORAGE_KEY);
+    if (raw) return normalizeStoredNflResults(JSON.parse(raw));
+  } catch { /* use empty */ }
+  return {};
+}
+
 export default function App() {
   const [stored, setStored] = useState<StoredResults>(loadLocalResults);
+  const [storedNfl, setStoredNfl] = useState<StoredNflResults>(loadLocalNflResults);
   const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash);
-  // null = no published briefing yet (pre-launch, or admin hasn't
-  // snapshotted today) — falls back to a live-computed one below rather
-  // than leaving Today's Briefing empty.
   const [dailyBriefing, setDailyBriefing] = useState<{ date: string; payload: MorningForecastData } | null>(null);
 
-  // Real browser history integration — without this, switching tabs never
-  // touches the URL or history stack at all, so the phone's back button has
-  // nothing of ours to go back TO and falls through to wherever the user
-  // was before opening the app (Google, a text message, etc.) instead of
-  // the previous tab. changeTab() pushes a real history entry per tab
-  // switch; the popstate listener below syncs state back when the user
-  // actually presses back/forward, without pushing another entry itself
-  // (that would create an infinite back-forward loop).
   function changeTab(tab: TabId) {
     if (tab === activeTab) return;
     window.history.pushState({ tab }, "", `#${tab}`);
@@ -101,9 +91,6 @@ export default function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
-  // If the app loads with no hash yet (first visit), replace (not push) so
-  // there isn't an extra back-stop before "home" — an actual tab switch is
-  // what should create the first real history entry, not the initial load.
   useEffect(() => {
     if (!window.location.hash) {
       window.history.replaceState({ tab: "home" }, "", "#home");
@@ -125,6 +112,19 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    loadNflResults()
+      .then((results) => {
+        if (!active) return;
+        const normalized = normalizeStoredNflResults(results);
+        setStoredNfl(normalized);
+        localStorage.setItem(NFL_STORAGE_KEY, JSON.stringify(normalized));
+      })
+      .catch((err) => console.error("Failed to load NFL results", err));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     loadLatestDailyBriefing<MorningForecastData>("world_cup")
       .then((result) => {
         if (active && result) setDailyBriefing(result);
@@ -135,10 +135,6 @@ export default function App() {
 
   const liveTeams     = useMemo(() => buildLiveTeams(stored), [stored]);
   const liveMorning   = useMemo(() => buildLiveMorningForecast(liveTeams, stored), [liveTeams, stored]);
-  // Today's Briefing shows whatever was last actually published by the
-  // admin snapshot action — not a live recompute — so it reads as a
-  // fixed daily digest instead of shifting on every render. Falls back
-  // to a live-computed one (dated today) only when nothing's published yet.
   const morning     = dailyBriefing?.payload ?? liveMorning;
   const morningDate = dailyBriefing?.date ?? new Date().toISOString().slice(0, 10);
   const liveHeadlines = useMemo(() => buildLiveHeadlines(liveTeams, stored), [liveTeams, stored]);
@@ -199,6 +195,7 @@ export default function App() {
       {isAdmin && (
         <>
           <AdminResultsPanel stored={stored} onChange={setStored} onBriefingSaved={setDailyBriefing} />
+          <AdminNflResultsPanel stored={storedNfl} onChange={setStoredNfl} />
           <AdminFantasyRankingsPanel />
         </>
       )}

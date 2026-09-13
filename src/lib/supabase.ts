@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { StoredResults } from "./types";
+import type { StoredNflResults } from "../data/nfl/nflLive";
 import { GROUP_MATCHES } from "../data";
 import { TEAM_BY_CODE } from "./teams";
 
@@ -34,6 +35,24 @@ export async function loadOfficialResults(): Promise<StoredResults> {
   return { matches, knockoutMatches };
 }
 
+export async function loadNflResults(): Promise<StoredNflResults> {
+  const { data, error } = await supabase
+    .from("match_results")
+    .select("match_id, home_goals, away_goals")
+    .like("match_id", "nfl-%");
+
+  if (error) throw error;
+
+  const results: StoredNflResults = {};
+  for (const row of data) {
+    results[row.match_id] = {
+      homeScore: row.home_goals,
+      awayScore: row.away_goals,
+    };
+  }
+  return results;
+}
+
 export async function saveOfficialResult(
   matchId: string,
   homeGoals: number,
@@ -43,8 +62,7 @@ export async function saveOfficialResult(
   matchDate?: string,
   penaltyWinner?: "home" | "away",
 ): Promise<void> {
-  // For group matches, look up team names from GROUP_MATCHES
-  if (!homeTeam && !matchId.startsWith("ko-")) {
+  if (!homeTeam && !matchId.startsWith("ko-") && !matchId.startsWith("nfl-")) {
     const match = GROUP_MATCHES.find((m) => m.id === matchId);
     if (match) {
       homeTeam = TEAM_BY_CODE[match.home]?.name;
@@ -87,14 +105,6 @@ export async function loadLatestOfficialResultUpdate() {
 
 const ADMIN_SECRET_STORAGE_KEY = "veridex-admin-secret";
 
-/**
- * Asks for the admin write secret once (the password set as
- * ADMIN_WRITE_SECRET in Vercel's environment variables) and remembers it
- * in this browser's localStorage afterward, so it isn't re-prompted on
- * every save. This only matters for whoever is actually entering
- * results — regular visitors never hit this path since they never
- * trigger a save or delete.
- */
 function getAdminSecret(): string {
   const stored = localStorage.getItem(ADMIN_SECRET_STORAGE_KEY);
   if (stored) return stored;
@@ -113,8 +123,6 @@ export async function callSaveResultApi(body: Record<string, unknown>): Promise<
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
     if (response.status === 401) {
-      // Wrong or stale password — clear it so the next attempt re-prompts
-      // instead of silently failing forever with the same bad value.
       localStorage.removeItem(ADMIN_SECRET_STORAGE_KEY);
     }
     throw new Error(payload.error ?? `Save failed (${response.status})`);
