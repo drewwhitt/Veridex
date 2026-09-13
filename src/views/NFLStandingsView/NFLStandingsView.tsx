@@ -1,45 +1,44 @@
 import { useMemo } from "react";
 import { buildNflStandings } from "../../data/nfl/nflLive";
+import type { StoredNflResults } from "../../data/nfl/nflLive";
 import s from "./NFLStandingsView.module.css";
 
-export function NFLStandingsView() {
-  const divisions = useMemo(() => buildNflStandings(), []);
+type Props = {
+  stored: StoredNflResults;
+};
+
+export function NFLStandingsView({ stored }: Props) {
+  const standings = useMemo(() => buildNflStandings(stored), [stored]);
 
   return (
-    <>
-      <section className={s.header}>
-        <h1>2026 Standings</h1>
-        <p>
-          Every team reads 0-0-0 today — there's no live NFL results pipeline yet (manual entry is the
-          planned next step, same as the World Cup admin panel). Records will fill in by division as
-          real scores come in.
-        </p>
-      </section>
-
-      <div className={s.groupsGrid}>
-        {divisions.map((div) => (
-          <div className={s.groupCard} key={`${div.conference}-${div.division}`}>
-            <div className={s.groupCardHeader}>{div.conference} {div.division}</div>
-            <div className={s.groupTable}>
-              <div className={s.groupTableHead}>
-                <span className={s.groupTeamCol}>Team</span>
-                <span>W</span><span>L</span><span>T</span><span>PCT</span>
-              </div>
-              {div.rows.map((row) => (
-                <div className={s.groupRow} key={row.code}>
-                  <span className={s.groupTeamCol}>
-                    <span className={s.groupTeamName}>{row.code}</span>
-                  </span>
-                  <span>{row.wins}</span>
-                  <span>{row.losses}</span>
-                  <span>{row.ties}</span>
-                  <span>{row.pct.toFixed(3).replace(/^0/, "")}</span>
-                </div>
+    <div className={s.container}>
+      {standings.map((division) => (
+        <div key={`${division.conference}-${division.division}`} className={s.division}>
+          <h2>{division.division} ({division.conference})</h2>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>W</th>
+                <th>L</th>
+                <th>T</th>
+                <th>PCT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {division.rows.map((row) => (
+                <tr key={row.code} className={s.row}>
+                  <td className={s.teamName}>{row.name}</td>
+                  <td>{row.wins}</td>
+                  <td>{row.losses}</td>
+                  <td>{row.ties}</td>
+                  <td>{row.pct.toFixed(3)}</td>
+                </tr>
               ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
   );
 }

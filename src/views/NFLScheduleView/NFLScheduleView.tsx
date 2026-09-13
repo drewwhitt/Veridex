@@ -1,10 +1,14 @@
-import { useMemo, useState } from "react";
-import { buildNflMatchCenter, buildNflPeriodStatuses, NFL_PERIODS } from "../../data/nfl/nflLive";
-import { getCurrentPeriodId } from "../../lib/periods";
+import { useMemo } from "react";
+import { buildNflMatchCenter } from "../../data/nfl/nflLive";
+import type { StoredNflResults } from "../../data/nfl/nflLive";
 import s from "./NFLScheduleView.module.css";
 
-export function NFLScheduleView() {
-  const entries = useMemo(() => buildNflMatchCenter(), []);
+type Props = {
+  stored: StoredNflResults;
+};
+
+export function NFLScheduleView({ stored }: Props) {
+  const entries = useMemo(() => buildNflMatchCenter(stored), [stored]);
 
   const byPeriod = useMemo(() => {
     const map = new Map<string, typeof entries>();
@@ -16,60 +20,42 @@ export function NFLScheduleView() {
     return map;
   }, [entries]);
 
-  // Completion-based, same convention as Match Center: the "current" week
-  // is the first one that isn't fully played out yet, not whatever the
-  // calendar date says — matches the admin's sometimes-delayed result entry.
-  const statuses = useMemo(() => buildNflPeriodStatuses(entries), [entries]);
-  const currentPeriodId = useMemo(() => getCurrentPeriodId(NFL_PERIODS, statuses), [statuses]);
-
-  // Only the current week starts open; every other week is collapsed so
-  // the page isn't 272 games long by default. Toggling is manual after that.
-  const [openPeriodId, setOpenPeriodId] = useState<string>(currentPeriodId);
+  const periods = Array.from(byPeriod.keys()).sort();
 
   return (
-    <>
-      <section className={s.header}>
-        <h1>2026 Schedule</h1>
-        <p>All 272 games, as announced. Scores will appear here once results are entered.</p>
-      </section>
-
-      {NFL_PERIODS.map((period) => {
-        const games = byPeriod.get(period.id) ?? [];
-        if (games.length === 0) return null;
-        const isOpen = openPeriodId === period.id;
+    <div className={s.container}>
+      {periods.map((periodId) => {
+        const games = byPeriod.get(periodId) ?? [];
         return (
-          <section className={s.period} key={period.id}>
-            <button
-              type="button"
-              className={s.periodToggle}
-              aria-expanded={isOpen}
-              onClick={() => setOpenPeriodId(isOpen ? "" : period.id)}
-            >
-              <h2>{period.label}</h2>
-              <span className={s.chevron}>{isOpen ? "▾" : "▸"}</span>
-            </button>
-            {isOpen && (
-              <div className={s.list}>
-                {games.map((g) => (
-                  <div className={s.row} key={g.id}>
-                    <div className={s.date}>{g.date}</div>
-                    <div className={s.matchup}>
-                      {g.awayName} <span className={s.at}>at</span> {g.homeName}
+          <div key={periodId} className={s.period}>
+            <h2>{periodId}</h2>
+            <div className={s.games}>
+              {games.map((game) => (
+                <div key={game.id} className={s.game}>
+                  <div className={s.matchup}>
+                    <div className={s.team}>
+                      <span className={s.name}>{game.awayName}</span>
+                      {game.homeScore !== undefined && (
+                        <span className={s.score}>{game.homeScore}</span>
+                      )}
                     </div>
-                    <div className={s.tags}>
-                      {g.div && <span className={s.tag}>Div</span>}
-                      {g.neutral && <span className={s.tag}>Neutral</span>}
-                    </div>
-                    <div className={s.status}>
-                      {g.played ? `${g.awayScore}–${g.homeScore}` : "Scheduled"}
+                    <div className={s.vs}>@</div>
+                    <div className={s.team}>
+                      <span className={s.name}>{game.homeName}</span>
+                      {game.awayScore !== undefined && (
+                        <span className={s.score}>{game.awayScore}</span>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                  {game.date && (
+                    <div className={s.date}>{game.date}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         );
       })}
-    </>
+    </div>
   );
 }

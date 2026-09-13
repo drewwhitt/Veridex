@@ -18,7 +18,7 @@ import {
   applyMeanReversion,
   sampleMatchWinner,
   sampleShootoutWinner,
-  type MatchContext,
+
   type MatchOutcomeProbabilities,
 } from '../core/EloEngine';
 import { NFL, type SportConfig } from '../core/SportConfig';

@@ -155,13 +155,13 @@ export default function App() {
       case "analytics":
         return <AnalyticsView stored={stored} teams={liveTeams} />;
       case "nflSchedule":
-        return <NFLScheduleView />;
+        return <NFLScheduleView stored={storedNfl} />;
       case "nflRankings":
-        return <NFLRankingsView />;
+        return <NFLRankingsView stored={storedNfl} />;
       case "nflStandings":
-        return <NFLStandingsView />;
+        return <NFLStandingsView stored={storedNfl} />;
       case "nflForecasts":
-        return <NFLForecastsView />;
+        return <NFLForecastsView stored={storedNfl} />;
       case "nflFantasy":
         return <FantasyView />;
       case "home":

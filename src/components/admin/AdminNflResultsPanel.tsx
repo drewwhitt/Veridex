@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { saveOfficialResult } from "../../lib/supabase";
 import { NFL_SCHEDULE, fullTeamName } from "../../data/nfl/nflLive";
 import type { StoredNflResults } from "../../data/nfl/nflLive";
@@ -15,6 +15,8 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
   const [homeScore, setHomeScore] = useState("0");
   const [awayScore, setAwayScore] = useState("0");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const homeInputRef = useRef<HTMLInputElement>(null);
+  const awayInputRef = useRef<HTMLInputElement>(null);
 
   // Get all unique weeks from the schedule
   const weeks = useMemo(() => {
@@ -50,6 +52,20 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
     setHomeScore(saved?.homeScore.toString() ?? "0");
     setAwayScore(saved?.awayScore.toString() ?? "0");
     setStatus("idle");
+  }
+
+  function focusAwayInput() {
+    if (awayInputRef.current) {
+      awayInputRef.current.focus();
+      awayInputRef.current.setSelectionRange(0, 0);
+    }
+  }
+
+  function focusHomeInput() {
+    if (homeInputRef.current) {
+      homeInputRef.current.focus();
+      homeInputRef.current.setSelectionRange(0, 0);
+    }
   }
 
   async function saveResult() {
@@ -131,21 +147,25 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
                 <div className={s.scoreInput}>
                   <label htmlFor="away-score">Away Score</label>
                   <input
+                    ref={awayInputRef}
                     id="away-score"
                     type="number"
                     min="0"
                     value={awayScore}
                     onChange={(e) => setAwayScore(e.target.value)}
+                    onFocus={focusAwayInput}
                   />
                 </div>
                 <div className={s.scoreInput}>
                   <label htmlFor="home-score">Home Score</label>
                   <input
+                    ref={homeInputRef}
                     id="home-score"
                     type="number"
                     min="0"
                     value={homeScore}
                     onChange={(e) => setHomeScore(e.target.value)}
+                    onFocus={focusHomeInput}
                   />
                 </div>
               </div>
