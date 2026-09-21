@@ -73,7 +73,7 @@ export const NFL_PERIODS: Period[] = (() => {
 
 /** Same shape of curve as the World Cup's ratingFromElo — a 0-100 display rating, not a probability. */
 function ratingFromElo(elo: number): number {
-  return Number(Math.max(55, Math.min(96, (elo - 1300) / 8)).toFixed(1));
+  return Number(Math.max(55, Math.min(96, 55 + (elo - 1500) / 5)).toFixed(1));
 }
 
 export function fullTeamName(code: string): string {

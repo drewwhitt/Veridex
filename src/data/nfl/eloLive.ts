@@ -13,6 +13,11 @@ export function buildLiveElos(stored: StoredNflResults = {}): Record<string, num
 
   const resultsCount = Object.keys(stored).length;
   console.log(`[Elo] Building live Elos with ${resultsCount} results`);
+  console.log(`[Elo] Sample baseline Elos:`, {
+    SEA: eloByCode.get("SEA"),
+    NE: eloByCode.get("NE"),
+    SF: eloByCode.get("SF"),
+  });
 
   // Apply actual game results to update Elos
   let gamesProcessed = 0;
@@ -39,6 +44,11 @@ export function buildLiveElos(stored: StoredNflResults = {}): Record<string, num
   }
 
   console.log(`[Elo] Processed ${gamesProcessed} games`);
+  console.log(`[Elo] Final Elos after results:`, {
+    SEA: eloByCode.get("SEA"),
+    NE: eloByCode.get("NE"),
+    SF: eloByCode.get("SF"),
+  });
   return Object.fromEntries(eloByCode);
 }
 
