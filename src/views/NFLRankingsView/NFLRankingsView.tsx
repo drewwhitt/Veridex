@@ -10,7 +10,7 @@ type Props = {
 };
 
 function ratingFromElo(elo: number): number {
-  return Number(Math.max(55, Math.min(96, 55 + (elo - 1500) / 5)).toFixed(1));
+  return Number(Math.max(0, Math.min(100, 50 + (elo - 1500) / 3)).toFixed(1));
 }
 
 export function NFLRankingsView({ stored }: Props) {
