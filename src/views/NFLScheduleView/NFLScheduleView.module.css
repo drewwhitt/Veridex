@@ -54,7 +54,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 100px 1fr auto 90px;
+  grid-template-columns: 100px 1fr auto 130px;
   align-items: center;
   gap: 12px;
   padding: 10px 0;

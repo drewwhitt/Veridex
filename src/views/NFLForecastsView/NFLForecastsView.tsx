@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { fullTeamName } from "../../data/nfl/nflLive";
-import forecastData from "../../data/nfl/forecast-2026.json";
+import { buildLiveForecast } from "../../data/nfl/forecastLive";
 import type { StoredNflResults } from "../../data/nfl/nflLive";
 import s from "./NFLForecastsView.module.css";
 
@@ -8,17 +8,19 @@ type Props = {
   stored: StoredNflResults;
 };
 
+const SIMULATIONS = 5000;
+
 export function NFLForecastsView({ stored }: Props) {
-  const forecasts = useMemo(() => [...forecastData.forecasts].sort((a, b) => b.superBowlPct - a.superBowlPct), []);
+  const forecasts = useMemo(() => buildLiveForecast(stored), [stored]);
 
   return (
     <>
       <section className={s.header}>
         <h1>2026 Season Forecast</h1>
         <p>
-          {forecastData.simulations.toLocaleString()} simulated seasons, including real playoff seeding (division
-          winners, wildcards, tiebreakers) and the actual bracket. Built from the preseason Elo baseline — there's
-          no real 2026 result in here yet, so treat this as a starting point that will move once games are played.
+          {SIMULATIONS.toLocaleString()} simulated seasons from current standings. Includes actual results played so far
+          and projects remaining games using live Elo ratings. Playoff seeding follows real rules (division winners, wildcards).
+          Updates as scores are entered.
         </p>
       </section>
 

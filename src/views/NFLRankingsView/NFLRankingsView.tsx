@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import { buildNflTeams } from "../../data/nfl/nflLive";
+import { buildLiveElos } from "../../data/nfl/eloLive";
+import { NFL_TEAM_BY_CODE } from "../../data/nfl/teams";
 import type { StoredNflResults } from "../../data/nfl/nflLive";
 import s from "./NFLRankingsView.module.css";
 
@@ -7,8 +9,21 @@ type Props = {
   stored: StoredNflResults;
 };
 
+function ratingFromElo(elo: number): number {
+  return Number(Math.max(55, Math.min(96, (elo - 1300) / 8)).toFixed(1));
+}
+
 export function NFLRankingsView({ stored }: Props) {
-  const teams = useMemo(() => buildNflTeams(), [stored]);
+  const baselineTeams = useMemo(() => buildNflTeams(), []);
+  const liveElos = useMemo(() => buildLiveElos(stored), [stored]);
+
+  const teams = useMemo(() => {
+    return baselineTeams.map((t) => ({
+      ...t,
+      elo: liveElos[t.code] ?? t.elo,
+      rating: ratingFromElo(liveElos[t.code] ?? t.elo),
+    })).sort((a, b) => b.elo - a.elo);
+  }, [baselineTeams, liveElos]);
   const afc = teams.filter((t) => t.conference === "AFC");
   const nfc = teams.filter((t) => t.conference === "NFC");
 
