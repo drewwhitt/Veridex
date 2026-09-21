@@ -11,11 +11,16 @@ export function buildLiveElos(stored: StoredNflResults = {}): Record<string, num
   const baselineTeams = buildNflTeams();
   const eloByCode = new Map(baselineTeams.map((t) => [t.code, t.elo]));
 
+  const resultsCount = Object.keys(stored).length;
+  console.log(`[Elo] Building live Elos with ${resultsCount} results`);
+
   // Apply actual game results to update Elos
+  let gamesProcessed = 0;
   for (const game of NFL_SCHEDULE) {
     if (game.type !== "REG") continue;
     const result = stored[game.id];
     if (!result) continue;
+    gamesProcessed++;
 
     const homeElo = eloByCode.get(game.home) ?? 1500;
     const awayElo = eloByCode.get(game.away) ?? 1500;
@@ -33,6 +38,7 @@ export function buildLiveElos(stored: StoredNflResults = {}): Record<string, num
     eloByCode.set(game.away, newAwayElo);
   }
 
+  console.log(`[Elo] Processed ${gamesProcessed} games`);
   return Object.fromEntries(eloByCode);
 }
 
