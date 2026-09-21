@@ -7,15 +7,16 @@ import { ErrorBoundary } from "./components/shell/ErrorBoundary";
 import type { Edition, MorningForecast as MorningForecastData, TabId } from "./data/worldCup";
 import seedResults from "./data/results.json";
 import {
-  buildLiveBreakingText,
+  buildLiveBreakingText as buildWorldCupBreakingText,
   buildLiveHeadlines,
   buildLiveMorningForecast,
   buildLiveTeams,
 } from "./data/veridexLive";
-import { loadOfficialResults, loadNflResults } from "./lib/supabase";
+import { loadOfficialResults, loadNflResults, debugGetNflResults } from "./lib/supabase";
 import { loadLatestDailyBriefing } from "./lib/dailyBriefing";
 import type { StoredResults } from "./lib/types";
 import type { StoredNflResults } from "./data/nfl/nflLive";
+import { buildNflBreakingText } from "./data/nfl/nflLiveUpdates";
 import { HomeView } from "./views/HomeView/HomeView";
 
 const BracketView = lazy(() => import("./views/BracketView/BracketView").then((m) => ({ default: m.BracketView })));
@@ -77,6 +78,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>(getTabFromHash);
   const [dailyBriefing, setDailyBriefing] = useState<{ date: string; payload: MorningForecastData } | null>(null);
 
+  // Expose debug functions to window for browser console access
+  useEffect(() => {
+    (window as any).__veridexDebug = {
+      storedNfl,
+      checkSupabase: debugGetNflResults,
+      getFromStorage: () => JSON.parse(localStorage.getItem("nfl-results") || "{}"),
+    };
+    console.log("[App] Debug helpers exposed at __veridexDebug");
+  }, [storedNfl]);
+
   function changeTab(tab: TabId) {
     if (tab === activeTab) return;
     window.history.pushState({ tab }, "", `#${tab}`);
@@ -112,15 +123,28 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    loadNflResults()
-      .then((results) => {
+    const fetchNflResults = async () => {
+      try {
+        const results = await loadNflResults();
         if (!active) return;
         const normalized = normalizeStoredNflResults(results);
         setStoredNfl(normalized);
         localStorage.setItem(NFL_STORAGE_KEY, JSON.stringify(normalized));
-      })
-      .catch((err) => console.error("Failed to load NFL results", err));
-    return () => { active = false; };
+        const count = Object.keys(normalized).length;
+        if (count > 0) {
+          console.log(`[NFL] Synced ${count} results from Supabase`);
+        }
+      } catch (err) {
+        console.error("Failed to load NFL results", err);
+      }
+    };
+
+    fetchNflResults();
+    const interval = setInterval(fetchNflResults, 30000); // Poll every 30s
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -138,9 +162,19 @@ export default function App() {
   const morning     = dailyBriefing?.payload ?? liveMorning;
   const morningDate = dailyBriefing?.date ?? new Date().toISOString().slice(0, 10);
   const liveHeadlines = useMemo(() => buildLiveHeadlines(liveTeams, stored), [liveTeams, stored]);
-  const liveBreaking  = useMemo(() => buildLiveBreakingText(liveTeams, stored), [liveTeams, stored]);
+  const nflBreaking   = useMemo(() => buildNflBreakingText(storedNfl), [storedNfl]);
   const playedCount   = Object.keys(stored.matches).length;
+  const nflPlayedCount = Object.keys(storedNfl).length;
+
+  // Show NFL breaking text (World Cup season is over)
+  const liveBreaking  = nflBreaking.text;
   const isAdmin       = new URLSearchParams(window.location.search).get("admin") === "true";
+
+  // Log debug info to console
+  useEffect(() => {
+    console.log("[App] Mounted - NFL results loaded:", nflPlayedCount);
+    console.log("[App] storedNfl:", storedNfl);
+  }, [nflPlayedCount, storedNfl]);
 
   function renderContent() {
     switch (activeTab) {

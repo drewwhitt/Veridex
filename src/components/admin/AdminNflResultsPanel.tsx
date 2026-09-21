@@ -57,14 +57,12 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
   function focusAwayInput() {
     if (awayInputRef.current) {
       awayInputRef.current.focus();
-      awayInputRef.current.setSelectionRange(0, 0);
     }
   }
 
   function focusHomeInput() {
     if (homeInputRef.current) {
       homeInputRef.current.focus();
-      homeInputRef.current.setSelectionRange(0, 0);
     }
   }
 
@@ -85,10 +83,16 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
     setStatus("saving");
 
     try {
-      await saveOfficialResult(selectedGameId, home, away);
+      const dbMatchId = `nfl-${selectedGameId}`;
+      console.log(`[NFL Admin] Saving ${dbMatchId}: ${home} - ${away}`);
+      await saveOfficialResult(dbMatchId, home, away);
+      console.log(`[NFL Admin] ✓ Successfully saved ${dbMatchId}`);
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[NFL Admin] ✗ Failed to save ${selectedGameId}:`, errMsg);
+      alert(`Failed to save: ${errMsg}`);
       setStatus("error");
     }
   }

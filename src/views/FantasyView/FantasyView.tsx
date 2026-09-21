@@ -270,10 +270,6 @@ export function FantasyView() {
                       min={0}
                       max={field === "FLEX" ? 4 : 6}
                       value={roster[field]}
-                      onFocus={(e) => {
-                        const len = e.currentTarget.value.length;
-                        e.currentTarget.setSelectionRange(len, len);
-                      }}
                       onChange={(e) => handleRosterField(field, Number(e.target.value) || 0)}
                     />
                   </div>
