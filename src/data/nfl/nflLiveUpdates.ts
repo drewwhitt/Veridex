@@ -1,4 +1,4 @@
-import { buildNflStandings, buildNflTeams, NFL_SCHEDULE, fullTeamName, type StoredNflResults } from "./nflLive";
+import { buildNflStandings, type StoredNflResults } from "./nflLive";
 
 export interface NflBreakingUpdate {
   text: string;

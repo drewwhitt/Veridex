@@ -1,6 +1,7 @@
 import { type Headline, type MorningForecast as MorningForecastData, type Team, type TabId } from "../../data/worldCup";
 import { TEAM_BY_CODE } from "../../lib/teams";
 import type { StoredResults } from "../../lib/types";
+import type { StoredNflResults } from "../../data/nfl/nflLive";
 import { NflPreview } from "../../components/nfl/NflPreview";
 import { Hero } from "./Hero";
 import { HeadlineCard } from "./HeadlineCard";
@@ -20,6 +21,7 @@ type Props = {
   headlines: Headline[];
   playedCount: number;
   stored: StoredResults;
+  nflStored: StoredNflResults;
   onNavigate?: (tab: TabId) => void;
 };
 
@@ -34,6 +36,7 @@ export function HomeView({
   headlines,
   playedCount,
   stored,
+  nflStored,
   onNavigate,
 }: Props) {
   // Confidence Alert rotates through the top of the same deterministic
@@ -59,7 +62,7 @@ export function HomeView({
     <>
       <Hero teams={teams} playedCount={playedCount} stored={stored} headline={heroHeadline} />
 
-      {onNavigate && <NflPreview onNavigate={onNavigate} />}
+      {onNavigate && <NflPreview onNavigate={onNavigate} stored={nflStored} />}
 
       {!isComplete && (
         <QuickStrip teams={teams} onNavigate={onNavigate ? () => onNavigate("rankings") : undefined} />

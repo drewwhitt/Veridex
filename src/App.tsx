@@ -7,7 +7,6 @@ import { ErrorBoundary } from "./components/shell/ErrorBoundary";
 import type { Edition, MorningForecast as MorningForecastData, TabId } from "./data/worldCup";
 import seedResults from "./data/results.json";
 import {
-  buildLiveBreakingText as buildWorldCupBreakingText,
   buildLiveHeadlines,
   buildLiveMorningForecast,
   buildLiveTeams,
@@ -201,13 +200,14 @@ export default function App() {
       case "home":
       default:
         return (
-          <HomeView
+            <HomeView
             teams={liveTeams}
             morning={morning}
             morningDate={morningDate}
             headlines={liveHeadlines}
             playedCount={playedCount}
             stored={stored}
+            nflStored={storedNfl}
             onNavigate={changeTab}
           />
         );

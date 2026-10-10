@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { buildNflTeams } from "../../data/nfl/nflLive";
 import { buildLiveElos } from "../../data/nfl/eloLive";
-import { NFL_TEAM_BY_CODE } from "../../data/nfl/teams";
 import type { StoredNflResults } from "../../data/nfl/nflLive";
 import s from "./NFLRankingsView.module.css";
 

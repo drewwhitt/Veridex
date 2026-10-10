@@ -186,3 +186,28 @@ export function buildNflStandings(stored: StoredNflResults = {}): NflDivisionSta
   ];
   return order.map(([conference, division]) => groups.get(`${conference}-${division}`)!);
 }
+
+export interface NflWeekProgress { week: number; played: number; total: number; }
+
+export function getNflWeekProgress(stored: StoredNflResults = {}): NflWeekProgress[] {
+  const weeks = new Map<number, NflWeekProgress>();
+  for (const game of NFL_SCHEDULE) {
+    if (game.type !== "REG") continue;
+    const p = weeks.get(game.week) ?? { week: game.week, played: 0, total: 0 };
+    p.total += 1;
+    if (stored[game.id]) p.played += 1;
+    weeks.set(game.week, p);
+  }
+  return Array.from(weeks.values()).sort((a, b) => a.week - b.week);
+}
+
+/** Week the admin should enter next. Stays on a partly-entered week;
+ *  rolls to the following week once the latest week is fully scored. */
+export function getNextNflWeek(stored: StoredNflResults = {}): number {
+  const progress = getNflWeekProgress(stored);
+  const last = progress.filter((p) => p.played > 0).reduce((m, p) => Math.max(m, p.week), 0);
+  if (last === 0) return 1;
+  const lastProgress = progress.find((p) => p.week === last);
+  if (lastProgress && lastProgress.played < lastProgress.total) return last;
+  return Math.min(18, last + 1);
+}

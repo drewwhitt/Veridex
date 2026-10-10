@@ -1,8 +1,7 @@
 import { buildLiveElos } from "./eloLive";
-import { buildNflStandings, NFL_SCHEDULE, type StoredNflResults } from "./nflLive";
+import { NFL_SCHEDULE, type StoredNflResults } from "./nflLive";
 import { NFL_TEAMS } from "./teams";
 
-const K_FACTOR = 32;
 const SIMULATIONS = 5000;
 
 function expectedWinProbability(elo1: number, elo2: number): number {
@@ -24,7 +23,6 @@ export interface LiveForecast {
 }
 
 export function buildLiveForecast(stored: StoredNflResults = {}): LiveForecast[] {
-  const standings = buildNflStandings(stored);
   const liveElos = buildLiveElos(stored);
 
   // Count games played and remaining
@@ -182,7 +180,7 @@ export function buildLiveForecast(stored: StoredNflResults = {}): LiveForecast[]
     }
 
     // Division probability (division winner)
-    for (const [divKey, winner] of divisionWinners) {
+    for (const [, winner] of divisionWinners) {
       outcomes.get(winner)!.division++;
     }
   }

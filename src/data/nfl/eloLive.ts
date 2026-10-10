@@ -1,5 +1,4 @@
 import { buildNflTeams, NFL_SCHEDULE, type StoredNflResults } from "./nflLive";
-import { NFL_TEAM_BY_CODE } from "./teams";
 
 const K_FACTOR = 32; // Standard NFL Elo K-factor
 

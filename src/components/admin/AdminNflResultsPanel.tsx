@@ -1,6 +1,6 @@
-import { useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { saveOfficialResult } from "../../lib/supabase";
-import { NFL_SCHEDULE, fullTeamName } from "../../data/nfl/nflLive";
+import { NFL_SCHEDULE, fullTeamName, getNextNflWeek } from "../../data/nfl/nflLive";
 import type { StoredNflResults } from "../../data/nfl/nflLive";
 import s from "./AdminNflResultsPanel.module.css";
 
@@ -10,7 +10,11 @@ type Props = {
 };
 
 export function AdminNflResultsPanel({ stored, onChange }: Props) {
-  const [selectedWeek, setSelectedWeek] = useState(1);
+  // Start on the next week to enter, based on saved results.
+  const [selectedWeek, setSelectedWeek] = useState<number>(() => getNextNflWeek(stored));
+  // Once the admin picks a week by hand, stop auto-advancing so a save
+  // doesn't jump them away from a week they're correcting.
+  const weekTouched = useRef(false);
   const [selectedGameId, setSelectedGameId] = useState("");
   const [homeScore, setHomeScore] = useState("0");
   const [awayScore, setAwayScore] = useState("0");
@@ -18,30 +22,31 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
   const homeInputRef = useRef<HTMLInputElement>(null);
   const awayInputRef = useRef<HTMLInputElement>(null);
 
-  // Get all unique weeks from the schedule
+  // Follow saved results (e.g. after Supabase finishes loading) until the admin picks a week.
+  useEffect(() => {
+    if (!weekTouched.current) setSelectedWeek(getNextNflWeek(stored));
+  }, [stored]);
+
   const weeks = useMemo(() => {
     const weekSet = new Set<number>();
     for (const game of NFL_SCHEDULE) {
-      if (game.type === "REG") {
-        weekSet.add(game.week);
-      }
+      if (game.type === "REG") weekSet.add(game.week);
     }
     return Array.from(weekSet).sort((a, b) => a - b);
   }, []);
 
-  // Get games for selected week
   const gamesInWeek = useMemo(() => {
     return NFL_SCHEDULE.filter(
       (game) => game.type === "REG" && game.week === selectedWeek
     ).sort((a, b) => a.date.localeCompare(b.date));
   }, [selectedWeek]);
 
-  // Set first game when week changes
-  useMemo(() => {
-    if (gamesInWeek.length > 0 && (!selectedGameId || !gamesInWeek.find(g => g.id === selectedGameId))) {
-      selectGame(gamesInWeek[0].id);
-    }
-  }, [gamesInWeek]);
+  // When the week changes, select its first game and load its saved scores.
+  useEffect(() => {
+    const first = gamesInWeek[0];
+    if (first) selectGame(first.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedWeek]);
 
   function selectGame(gameId: string) {
     const game = NFL_SCHEDULE.find((g) => g.id === gameId);
@@ -55,15 +60,11 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
   }
 
   function focusAwayInput() {
-    if (awayInputRef.current) {
-      awayInputRef.current.focus();
-    }
+    awayInputRef.current?.focus();
   }
 
   function focusHomeInput() {
-    if (homeInputRef.current) {
-      homeInputRef.current.focus();
-    }
+    homeInputRef.current?.focus();
   }
 
   async function saveResult() {
@@ -106,7 +107,13 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
 
       <div className={s.section}>
         <label>Week</label>
-        <select value={selectedWeek} onChange={(e) => setSelectedWeek(Number(e.target.value))}>
+        <select
+          value={selectedWeek}
+          onChange={(e) => {
+            weekTouched.current = true;
+            setSelectedWeek(Number(e.target.value));
+          }}
+        >
           {weeks.map((w) => (
             <option key={w} value={w}>
               Week {w}
