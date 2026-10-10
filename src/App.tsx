@@ -17,6 +17,7 @@ import type { StoredResults } from "./lib/types";
 import type { StoredNflResults } from "./data/nfl/nflLive";
 import { buildNflBreakingText } from "./data/nfl/nflLiveUpdates";
 import { HomeView } from "./views/HomeView/HomeView";
+import { buildNflHomeHeadlines, buildNflMorningForecast } from "./data/nfl/nflHome";
 
 const BracketView = lazy(() => import("./views/BracketView/BracketView").then((m) => ({ default: m.BracketView })));
 const ForecastsView = lazy(() => import("./views/ForecastsView/ForecastsView").then((m) => ({ default: m.ForecastsView })));
@@ -158,9 +159,15 @@ export default function App() {
 
   const liveTeams     = useMemo(() => buildLiveTeams(stored), [stored]);
   const liveMorning   = useMemo(() => buildLiveMorningForecast(liveTeams, stored), [liveTeams, stored]);
-  const morning     = dailyBriefing?.payload ?? liveMorning;
-  const morningDate = dailyBriefing?.date ?? new Date().toISOString().slice(0, 10);
+   // NFL results drive the home page while the World Cup is complete.
+  const nflHeadlines = useMemo(() => buildNflHomeHeadlines(storedNfl), [storedNfl]);
+  const nflMorning   = useMemo(() => buildNflMorningForecast(storedNfl), [storedNfl]);
+  const morning     = nflMorning ?? dailyBriefing?.payload ?? liveMorning;
+  const morningDate = nflMorning
+    ? new Date().toLocaleDateString("en-CA")
+    : (dailyBriefing?.date ?? new Date().toISOString().slice(0, 10));
   const liveHeadlines = useMemo(() => buildLiveHeadlines(liveTeams, stored), [liveTeams, stored]);
+  const homeHeadlines = nflHeadlines.length > 0 ? nflHeadlines : liveHeadlines;
   const nflBreaking   = useMemo(() => buildNflBreakingText(storedNfl), [storedNfl]);
   const playedCount   = Object.keys(stored.matches).length;
   const nflPlayedCount = Object.keys(storedNfl).length;
@@ -204,7 +211,7 @@ export default function App() {
             teams={liveTeams}
             morning={morning}
             morningDate={morningDate}
-            headlines={liveHeadlines}
+            headlines={homeHeadlines}
             playedCount={playedCount}
             stored={stored}
             nflStored={storedNfl}
