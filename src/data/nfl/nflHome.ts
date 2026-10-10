@@ -26,7 +26,7 @@ function expectedWin(own: number, opp: number): number {
 }
 
 function eloMap(): Map<string, number> {
-  return new Map(buildNflTeams().map((t) => [t.code, t.elo]));
+  return new Map(buildNflTeams().map((t) => [t.code, Math.round(t.elo)]));
 }
 
 function playedGames(stored: StoredNflResults): PlayedGame[] {
@@ -52,6 +52,11 @@ function upsetsIn(games: PlayedGame[], elo: Map<string, number>) {
 
 function matchGap(g: PlayedGame, elo: Map<string, number>): number {
   return Math.abs((elo.get(g.home) ?? DEFAULT_ELO) - (elo.get(g.away) ?? DEFAULT_ELO));
+}
+
+/** Model's pre-game chance the underdog wins, from Elo ratings. */
+function underdogWinChance(gap: number): number {
+  return Math.round((1 / (1 + Math.pow(10, gap / 400))) * 100);
 }
 
 function teamLines(games: PlayedGame[], elo: Map<string, number>): Map<string, TeamLine> {
@@ -97,22 +102,28 @@ export function buildNflHomeHeadlines(stored: StoredNflResults): Headline[] {
   const progress = getNflWeekProgress(stored).find((p) => p.week === latestWeek);
   const scored: { score: number; headline: Headline }[] = [];
 
-  for (const u of upsetsIn(games, elo)) {
+  const topUpsets = [...upsetsIn(games, elo)]
+    .map((u) => ({ ...u, score: u.gap + (u.game.week === latestWeek ? 100 : 0) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 6);
+
+  for (const u of topUpsets) {
     const winScore = u.winner === u.game.home ? u.game.homeScore : u.game.awayScore;
     const loseScore = u.winner === u.game.home ? u.game.awayScore : u.game.homeScore;
+    const chance = underdogWinChance(u.gap);
     scored.push({
-      score: u.gap + (u.game.week === latestWeek ? 100 : 0),
+      score: u.score,
       headline: {
         title: `${fullTeamName(u.winner)} Upset ${fullTeamName(u.loser)}`,
-        summary: `${fullTeamName(u.winner)} won ${winScore}–${loseScore} as ${u.gap}-point underdogs on pre-season power ratings.`,
-        metric: `+${u.gap}`,
-        metricLabel: "Upset margin (Elo)",
+        summary: `${fullTeamName(u.winner)} won ${winScore}–${loseScore}. The Veridex model gave them a ${chance}% chance before kickoff.`,
+        metric: `${chance}%`,
+        metricLabel: "Model win chance",
         up: true,
       },
     });
   }
 
-  for (const l of lines.filter(isUnbeaten)) {
+  for (const l of lines.filter(isUnbeaten).slice(0, 3)) {
     scored.push({
       score: 80 + l.wins * 5,
       headline: {
@@ -125,7 +136,7 @@ export function buildNflHomeHeadlines(stored: StoredNflResults): Headline[] {
     });
   }
 
-  for (const l of lines.filter((l) => l.streak >= 3 && !isUnbeaten(l))) {
+  for (const l of lines.filter((l) => l.streak >= 3 && !isUnbeaten(l)).slice(0, 2)) {
     scored.push({
       score: 60 + l.streak * 5,
       headline: {
@@ -186,9 +197,9 @@ export function buildNflMorningForecast(stored: StoredNflResults): MorningForeca
     champVal: `${Math.round(topRated[1])}`,
     champNote: "Highest pre-season power rating",
     upset: topUpset ? fullTeamName(topUpset.winner) : "No upsets yet",
-    upsetVal: topUpset ? `+${topUpset.gap}` : "",
+    upsetVal: topUpset ? `${underdogWinChance(topUpset.gap)}%` : "",
     upsetNote: topUpset
-      ? `Beat ${fullTeamName(topUpset.loser)} in Week ${topUpset.game.week}`
+      ? `Beat ${fullTeamName(topUpset.loser)} in Week ${topUpset.game.week}. Model gave them ${underdogWinChance(topUpset.gap)}%.`
       : "Favorites have won every game so far",
     insight: `${games.length} of ${totalGames} regular-season games scored.`,
     isComplete: false,
@@ -221,7 +232,11 @@ export function buildNflWeekHighlights(stored: StoredNflResults): {
     }
   };
 
-  [...upsetsIn(weekGames, elo)].sort((a, b) => b.gap - a.gap).forEach((u) => add(u.game, "Biggest upset"));
+  // Top two upsets only, so the card doesn't fill with upsets.
+  [...upsetsIn(weekGames, elo)]
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, 2)
+    .forEach((u) => add(u.game, "Upset"));
   weekGames
     .filter((g) => unbeaten.has(g.home) || unbeaten.has(g.away))
     .forEach((g) => add(g, "Unbeaten team"));

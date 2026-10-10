@@ -1,8 +1,10 @@
+import type { ReactNode } from "react";
 import { type Headline, type MorningForecast as MorningForecastData, type Team, type TabId } from "../../data/worldCup";
 import { TEAM_BY_CODE } from "../../lib/teams";
 import type { StoredResults } from "../../lib/types";
 import type { StoredNflResults } from "../../data/nfl/nflLive";
 import { NflPreview } from "../../components/nfl/NflPreview";
+import { Carousel } from "../../components/carousel/Carousel";
 import { Hero } from "./Hero";
 import { HeadlineCard } from "./HeadlineCard";
 import { MorningForecast } from "./MorningForecast";
@@ -29,6 +31,9 @@ const TEAM_NAMES: Record<string, string> = Object.fromEntries(
   Object.entries(TEAM_BY_CODE).map(([code, t]) => [code, t.name]),
 );
 
+/** How many "Latest from the model" cards show at once. */
+const LATEST_PER_SLIDE = 4;
+
 export function HomeView({
   teams,
   morning,
@@ -39,24 +44,26 @@ export function HomeView({
   nflStored,
   onNavigate,
 }: Props) {
-  // Confidence Alert rotates through the top of the same deterministic
-  // headline rotation everywhere else in the app reads from — no separate
-  // "most notable" logic to keep in sync. The rest of the headline grid
-  // below shows what's left so nothing is duplicated. As other insight
-  // types come online (most-likely-champion, highest-upset-risk
-  // underdog, an against-the-grain pick) they'd join this same rotation
-  // rather than needing their own slot.
-  //
-  // Fixed at 3 for Confidence Alert. Right now, post-World-Cup, the total
-  // pool is small enough (~4-5 headlines) that this can leave Latest from
-  // the Model empty — that's expected and temporary, not a bug: once
-  // NFL/MLS headlines feed into this same pool, there will reliably be
-  // more than 4 total and this section fills back in on its own.
+  // Confidence Alert takes the top of the headline rotation (after the
+  // hero). Latest from the model takes whatever is left and rotates
+  // through it four at a time.
   const ALERT_SLIDE_COUNT = 3;
   const [heroHeadline, ...remainingHeadlines] = headlines;
   const alertHeadlines = remainingHeadlines.slice(0, ALERT_SLIDE_COUNT);
   const restHeadlines = remainingHeadlines.slice(ALERT_SLIDE_COUNT);
   const isComplete = teams.some((t) => t.isChampion);
+
+  const latestSlides: ReactNode[] = [];
+  for (let i = 0; i < restHeadlines.length; i += LATEST_PER_SLIDE) {
+    const group = restHeadlines.slice(i, i + LATEST_PER_SLIDE);
+    latestSlides.push(
+      <section className={s.headlineGrid} key={`latest-${i}`}>
+        {group.map((headline) => (
+          <HeadlineCard headline={headline} key={headline.title} />
+        ))}
+      </section>,
+    );
+  }
 
   return (
     <>
@@ -75,17 +82,13 @@ export function HomeView({
 
       <ConfidenceAlert headlines={alertHeadlines} />
 
-      {restHeadlines.length > 0 && (
+      {latestSlides.length > 0 && (
         <>
           <section className={s.latestHeader}>
             <h2>Latest from the model</h2>
             <span>Updated continuously</span>
           </section>
-          <section className={s.headlineGrid}>
-            {restHeadlines.map((headline) => (
-              <HeadlineCard headline={headline} key={headline.title} />
-            ))}
-          </section>
+          <Carousel items={latestSlides} intervalMs={8000} />
         </>
       )}
     </>
