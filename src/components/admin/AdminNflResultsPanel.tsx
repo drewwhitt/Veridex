@@ -68,25 +68,33 @@ export function AdminNflResultsPanel({ stored, onChange }: Props) {
   }
 
   async function saveResult() {
+    // Empty boxes read as 0 with Number(""), so check the raw text first.
+    const isScore = (raw: string) => raw.trim() !== "" && Number.isInteger(Number(raw)) && Number(raw) >= 0;
+    if (!isScore(homeScore) || !isScore(awayScore)) {
+      alert("Enter whole-number scores for both teams.");
+      return;
+    }
     const home = Number(homeScore);
     const away = Number(awayScore);
-    if (Number.isNaN(home) || Number.isNaN(away) || home < 0 || away < 0) return;
 
     const game = NFL_SCHEDULE.find((g) => g.id === selectedGameId);
     if (!game) return;
 
-    const next: StoredNflResults = {
-      ...stored,
-      [selectedGameId]: { homeScore: home, awayScore: away },
-    };
-    onChange(next);
-    localStorage.setItem("nfl-results", JSON.stringify(next));
     setStatus("saving");
 
     try {
       const dbMatchId = `nfl-${selectedGameId}`;
       console.log(`[NFL Admin] Saving ${dbMatchId}: ${home} - ${away}`);
+      // Write to the database first. Local state and cache update only after
+      // success, so a failed save never shows as saved.
       await saveOfficialResult(dbMatchId, home, away);
+
+      const next: StoredNflResults = {
+        ...stored,
+        [selectedGameId]: { homeScore: home, awayScore: away },
+      };
+      onChange(next);
+      localStorage.setItem("nfl-results", JSON.stringify(next));
       console.log(`[NFL Admin] ✓ Successfully saved ${dbMatchId}`);
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);

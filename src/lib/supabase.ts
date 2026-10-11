@@ -7,12 +7,25 @@ import { TEAM_BY_CODE } from "./teams";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Missing env vars used to make createClient throw at import, which blanked the
+// whole app. Now we log loudly and use a placeholder, so requests fail as
+// ordinary errors that the loaders already catch and report.
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error("[Supabase] VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is missing. Live results will not load.");
+}
+
+export const supabase = createClient(
+  supabaseUrl || "https://missing-supabase-url.invalid",
+  supabaseAnonKey || "missing-anon-key",
+);
 
 export async function loadOfficialResults(): Promise<StoredResults> {
+  // NFL rows share this table under an "nfl-" prefix. Exclude them here so
+  // they never show up as World Cup matches (played counts, ticker, admin).
   const { data, error } = await supabase
     .from("match_results")
-    .select("match_id, home_goals, away_goals, penalty_winner");
+    .select("match_id, home_goals, away_goals, penalty_winner")
+    .not("match_id", "like", "nfl-%");
 
   if (error) throw error;
 
@@ -136,8 +149,14 @@ function getAdminSecret(): string {
     return testSecret;
   }
 
-  // In production, require the secret to be set
-  throw new Error("Admin secret not configured. Set ADMIN_WRITE_SECRET environment variable.");
+  // In production the browser can't read the server's ADMIN_WRITE_SECRET, so
+  // ask the admin once and remember it for this browser.
+  const entered = window.prompt("Enter the admin write secret (stored in this browser only):")?.trim();
+  if (!entered) {
+    throw new Error("Admin write secret is required to save results.");
+  }
+  localStorage.setItem(ADMIN_SECRET_STORAGE_KEY, entered);
+  return entered;
 }
 
 export async function callSaveResultApi(body: Record<string, unknown>): Promise<void> {
@@ -148,24 +167,11 @@ export async function callSaveResultApi(body: Record<string, unknown>): Promise<
     body: JSON.stringify({ ...body, secret }),
   });
 
-  // If API endpoint doesn't exist (404 in dev), fall back to direct Supabase write
+  // No direct-to-Supabase fallback: writes must go through the server, which
+  // holds the service-role key and checks the secret. A 404 means the API isn't
+  // running (plain `vite` serves no /api routes; use `vercel dev` locally).
   if (response.status === 404) {
-    console.warn("API endpoint not available, falling back to direct Supabase write");
-    if (body.action === "save") {
-      const { matchId, homeGoals, awayGoals } = body as any;
-      const { error } = await supabase.from("match_results").upsert({
-        match_id: matchId,
-        home_goals: homeGoals,
-        away_goals: awayGoals,
-        updated_at: new Date().toISOString(),
-      });
-      if (error) {
-        console.error("Fallback Supabase write failed:", error);
-        throw new Error(`Supabase write failed: ${error.message}`);
-      }
-      console.log(`[Fallback] ✓ Saved ${matchId} to Supabase`);
-    }
-    return;
+    throw new Error("Save API not found. Run locally with `vercel dev`, or check the deployment.");
   }
 
   if (!response.ok) {

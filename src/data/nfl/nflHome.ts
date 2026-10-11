@@ -54,7 +54,11 @@ function matchGap(g: PlayedGame, elo: Map<string, number>): number {
   return Math.abs((elo.get(g.home) ?? DEFAULT_ELO) - (elo.get(g.away) ?? DEFAULT_ELO));
 }
 
-/** Model's pre-game chance the underdog wins, from Elo ratings. */
+/**
+ * Chance the underdog wins, from PRESEASON Elo (buildNflTeams reads the static
+ * baseline, not in-season results). It is not a live pre-kickoff forecast, so
+ * the copy says "preseason ratings".
+ */
 function underdogWinChance(gap: number): number {
   return Math.round((1 / (1 + Math.pow(10, gap / 400))) * 100);
 }
@@ -115,9 +119,9 @@ export function buildNflHomeHeadlines(stored: StoredNflResults): Headline[] {
       score: u.score,
       headline: {
         title: `${fullTeamName(u.winner)} Upset ${fullTeamName(u.loser)}`,
-        summary: `${fullTeamName(u.winner)} won ${winScore}–${loseScore}. The Veridex model gave them a ${chance}% chance before kickoff.`,
+        summary: `${fullTeamName(u.winner)} won ${winScore}–${loseScore}. Preseason ratings gave them a ${chance}% chance.`,
         metric: `${chance}%`,
-        metricLabel: "Model win chance",
+        metricLabel: "Preseason win chance",
         up: true,
       },
     });
@@ -199,7 +203,7 @@ export function buildNflMorningForecast(stored: StoredNflResults): MorningForeca
     upset: topUpset ? fullTeamName(topUpset.winner) : "No upsets yet",
     upsetVal: topUpset ? `${underdogWinChance(topUpset.gap)}%` : "",
     upsetNote: topUpset
-      ? `Beat ${fullTeamName(topUpset.loser)} in Week ${topUpset.game.week}. Model gave them ${underdogWinChance(topUpset.gap)}%.`
+      ? `Beat ${fullTeamName(topUpset.loser)} in Week ${topUpset.game.week}. Preseason ratings gave them ${underdogWinChance(topUpset.gap)}%.`
       : "Favorites have won every game so far",
     insight: `${games.length} of ${totalGames} regular-season games scored.`,
     isComplete: false,

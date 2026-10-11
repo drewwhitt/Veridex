@@ -59,9 +59,11 @@ export default async function handler(req: MinimalRequest, res: MinimalResponse)
     // Same row -> StoredResults transform as loadOfficialResults() in
     // src/lib/supabase.ts, just against the service-role client instead
     // of the client-side anon one.
+    // Skip NFL rows ("nfl-" prefix): they share this table but aren't World Cup matches.
     const { data, error: readError } = await supabase
       .from("match_results")
-      .select("match_id, home_goals, away_goals, penalty_winner");
+      .select("match_id, home_goals, away_goals, penalty_winner")
+      .not("match_id", "like", "nfl-%");
     if (readError) throw readError;
 
     const stored: StoredResults = { matches: {}, knockoutMatches: {} };
